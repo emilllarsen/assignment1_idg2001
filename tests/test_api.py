@@ -1,77 +1,137 @@
-"""API endpoint integration tests."""
-
-
 class TestUsers:
     def test_create_user(self, client):
-        resp = client.post("/v1/user", json={
+        response = client.post("/v1/user", json={
             "email": "test@example.com",
             "password": "secret123",
         })
-        assert resp.status_code == 201
-        assert resp.json()["email"] == "test@example.com"
-        assert resp.json()["tokens"] == 10
+        assert response.status_code == 201
+        assert response.json()["email"] == "test@example.com"
+        assert response.json()["tokens"] == 10  # new users always start with 10
 
     def test_duplicate_user(self, client):
         client.post("/v1/user", json={
             "email": "dupe@test.com", "password": "secret123",
         })
-        resp = client.post("/v1/user", json={
+        response = client.post("/v1/user", json={  # same email again, should fail
             "email": "dupe@test.com", "password": "other456",
         })
-        assert resp.status_code == 409
+        assert response.status_code == 409
 
     def test_get_user(self, client):
-        create = client.post("/v1/user", json={
+        create_response = client.post("/v1/user", json={
             "email": "find@test.com", "password": "secret123",
         })
-        user_id = create.json()["id"]
-        resp = client.get(f"/v1/user/{user_id}")
-        assert resp.status_code == 200
-        assert resp.json()["email"] == "find@test.com"
+        user_id = create_response.json()["id"]  # need the id to fetch the user
+        response = client.get(f"/v1/user/{user_id}")
+        assert response.status_code == 200
+        assert response.json()["email"] == "find@test.com"
 
     def test_delete_user(self, client):
-        create = client.post("/v1/user", json={
+        create_response = client.post("/v1/user", json={
             "email": "delete@test.com", "password": "secret123",
         })
-        user_id = create.json()["id"]
-        resp = client.delete(f"/v1/user/{user_id}")
-        assert resp.status_code == 204
+        user_id = create_response.json()["id"]
+        response = client.delete(f"/v1/user/{user_id}")
+        assert response.status_code == 204
 
 
 class TestTokens:
     def test_add_tokens(self, client):
-        create = client.post("/v1/user", json={
+        create_response = client.post("/v1/user", json={
             "email": "token@test.com", "password": "secret123",
         })
-        user_id = create.json()["id"]
-        resp = client.post("/v1/tokens", json={
+        user_id = create_response.json()["id"]
+        response = client.post("/v1/tokens", json={
             "user_id": user_id, "amount": 5,
         })
-        assert resp.json()["tokens"] == 15
+        assert response.json()["tokens"] == 15
 
     def test_token_consumption(self, client):
-        create = client.post("/v1/user", json={
+        create_response = client.post("/v1/user", json={
             "email": "consume@test.com", "password": "secret123",
         })
-        user_id = create.json()["id"]
+        user_id = create_response.json()["id"]
 
-        # Call a data endpoint
-        client.get("/v1/country/USA", headers={"X-User-Id": user_id})
+        client.get("/v1/country/JAM", headers={"X-User-Id": user_id})  # costs 1 token
 
-        # Check tokens went down
-        resp = client.get(f"/v1/user/{user_id}")
-        assert resp.json()["tokens"] == 9
+        response = client.get(f"/v1/user/{user_id}")
+        assert response.json()["tokens"] == 9
 
     def test_no_tokens_returns_403(self, client):
-        create = client.post("/v1/user", json={
+        create_response = client.post("/v1/user", json={
             "email": "broke@test.com", "password": "secret123",
         })
-        user_id = create.json()["id"]
+        user_id = create_response.json()["id"]
 
-        # Use all 10 tokens
-        for _ in range(10):
-            client.get("/v1/country/USA", headers={"X-User-Id": user_id})
+        for _ in range(10):  # use all 10 tokens
+            client.get("/v1/country/JAM", headers={"X-User-Id": user_id})
 
-        # 11th call should fail
-        resp = client.get("/v1/country/USA", headers={"X-User-Id": user_id})
-        assert resp.status_code == 403
+        response = client.get("/v1/country/JAM", headers={"X-User-Id": user_id})  # 11th call, no tokens left
+        assert response.status_code == 403
+
+
+class TestDataEndpoints:
+    def test_get_athlete_returns_data(self, client):
+        create_response = client.post("/v1/user", json={  # data endpoints need a user with tokens
+            "email": "data@test.com",
+            "password": "secret123",
+        })
+        user_id = create_response.json()["id"]
+
+        response = client.get(  # 2 usain bolt records seeded in conftest
+            "/v1/athlete/Usain-Bolt",
+            headers={"X-User-Id": user_id},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["count"] == 2
+        assert response.json()["results"][0]["noc"] == "JAM"
+
+    def test_get_country_returns_data(self, client):
+        create_response = client.post("/v1/user", json={
+            "email": "country@test.com",
+            "password": "secret123",
+        })
+        user_id = create_response.json()["id"]
+
+        response = client.get(  # petter northug is NOR, seeded in conftest
+            "/v1/country/NOR",
+            headers={"X-User-Id": user_id},
+        )
+
+        response_body = response.json()
+
+        assert response.status_code == 200
+        assert "Skiing" in response_body["sports"]
+
+    def test_get_sport_returns_data(self, client):
+        create_response = client.post("/v1/user", json={
+            "email": "sport@test.com",
+            "password": "secret123",
+        })
+        user_id = create_response.json()["id"]
+
+        response = client.get(  # 2 athletics records seeded in conftest
+            "/v1/sport/Athletics",
+            headers={"X-User-Id": user_id},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["count"] == 2
+
+    def test_athlete_not_found_does_not_deduct_token(self, client):
+        create_response = client.post("/v1/user", json={
+            "email": "nodeduce@test.com",
+            "password": "secret123",
+        })
+        user_id = create_response.json()["id"]
+
+        client.get(  # this athlete doesnt exist, should return 404
+            "/v1/athlete/nobody-ever",
+            headers={"X-User-Id": user_id},
+        )
+
+        user_response = client.get(f"/v1/user/{user_id}")
+        token_count = user_response.json()["tokens"]
+
+        assert token_count == 10  # should still be 10, failed requests dont cost tokens
