@@ -22,34 +22,34 @@ def seed_database():
             return
 
         print("Seeding database... this may take a moment.")
-        df = pd.read_csv(csv_path)
+        csv_data = pd.read_csv(csv_path)
 
         records = []
-        for _, row in df.iterrows():
+        for _, csv_row in csv_data.iterrows():
             record = OlympicEvent(
-                name=row.get("Name"),
-                sex=row.get("Sex"),
-                age=clean_float(row.get("Age")),
-                height=clean_float(row.get("Height")),
-                weight=clean_float(row.get("Weight")),
-                team=row.get("Team"),
-                noc=row.get("NOC"),
-                games=row.get("Games"),
-                year=clean_int(row.get("Year")),
-                season=row.get("Season"),
-                city=row.get("City"),
-                sport=row.get("Sport"),
-                event=row.get("Event"),
-                medal=clean_str(row.get("Medal")),
+                name=csv_row.get("Name"),
+                sex=csv_row.get("Sex"),
+                age=clean_float(csv_row.get("Age")),
+                height=clean_float(csv_row.get("Height")),
+                weight=clean_float(csv_row.get("Weight")),
+                team=csv_row.get("Team"),
+                noc=csv_row.get("NOC"),
+                games=csv_row.get("Games"),
+                year=clean_int(csv_row.get("Year")),
+                season=csv_row.get("Season"),
+                city=csv_row.get("City"),
+                sport=csv_row.get("Sport"),
+                event=csv_row.get("Event"),
+                medal=clean_str(csv_row.get("Medal")),
             )
             records.append(record)
 
-        chunk_size = 5000
+        chunk_size = 5000  # insert in chunks, doing it all at once uses too much memory
         for i in range(0, len(records), chunk_size):
             db.bulk_save_objects(records[i:i + chunk_size])
             db.commit()
-            n = min(i + chunk_size, len(records))
-            print(f"  Inserted {n}/{len(records)}")
+            records_inserted = min(i + chunk_size, len(records))
+            print(f"  Inserted {records_inserted}/{len(records)}")
 
         print("Seeding complete!")
     finally:
@@ -59,23 +59,27 @@ def seed_database():
 def clean_float(val):
     """Convert a value to float, returning None for NaN or missing."""
     try:
-        f = float(val)
-        if pd.isna(f):
+        float_value = float(val)
+        if pd.isna(float_value):
             return None
-        return f
+        return float_value
     except (ValueError, TypeError):
         return None
 
 
 def clean_int(val):
     """Convert a value to int, returning None for NaN or missing."""
-    f = clean_float(val)
-    return int(f) if f is not None else None
+    float_value = clean_float(val)
+    if float_value is not None:
+        return int(float_value)
+    return None
 
 
 def clean_str(val):
     """Convert a value to string, returning None for NaN or missing."""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
-    s = str(val).strip()
-    return s if s and s.lower() != "nan" else None
+    cleaned_string = str(val).strip()
+    if cleaned_string and cleaned_string.lower() != "nan":
+        return cleaned_string
+    return None
