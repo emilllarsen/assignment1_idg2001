@@ -55,17 +55,16 @@ def get_sport(
             "medal": record.medal,
         })
 
-    return format_response(
-        {
-            "sport": sport_name.replace("-", " ").title(),
-            "filters": {
-                "country": country,
-                "year": year,
-                "season": season,
-                "medals": medals,
-            },
-            "count": len(results),
-            "results": results,
+    data = {
+        "sport": sport_name.replace("-", " ").title(),
+        "filters": {
+            "country": country,
+            "year": year,
+            "season": season,
+            "medals": medals,
         },
-        fmt,
-    )
+        "count": len(results),
+        "results": results,
+    }
+
+    return format_response(data, fmt)
