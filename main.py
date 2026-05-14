@@ -1,13 +1,20 @@
 """Olympic Games API - Main application entry point."""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.database import engine, Base
 from app.routers import users, tokens, countries, athletes, sports, events
 from app.seed import seed_database
 
-Base.metadata.create_all(bind=engine)
-seed_database()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create tables and seed the database on startup."""
+    Base.metadata.create_all(bind=engine)
+    seed_database()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(users.router, prefix="/v1")
 app.include_router(tokens.router, prefix="/v1")
 app.include_router(countries.router, prefix="/v1")

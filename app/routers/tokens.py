@@ -10,7 +10,7 @@ router = APIRouter()
 
 @router.post("/tokens", response_model=TokenResponse)
 def add_tokens(payload: TokenAdd, db: Session = Depends(get_db)):
-    """Add tokens to a user's account."""
+    """Add tokens directly to a user's account."""
     user = db.query(User).filter(User.id == payload.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -22,8 +22,5 @@ def add_tokens(payload: TokenAdd, db: Session = Depends(get_db)):
     return {
         "user_id": user.id,
         "tokens": user.tokens,
-        "message": (
-            f"Added {payload.amount} tokens."
-            f" New balance: {user.tokens}"
-        ),
+        "message": f"Added {payload.amount} tokens. New balance: {user.tokens}",
     }

@@ -30,3 +30,20 @@ class TokenResponse(BaseModel):
     user_id: str
     tokens: int
     message: str
+
+
+class OlympicEventCreate(BaseModel):
+    name: str
+    noc: str
+    sport: str
+    event: Optional[str] = None
+    sex: Optional[str] = None
+    age: Optional[float] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    team: Optional[str] = None
+    games: Optional[str] = None
+    year: Optional[int] = None
+    season: Optional[str] = None
+    city: Optional[str] = None
+    medal: Optional[str] = None

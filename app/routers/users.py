@@ -1,24 +1,32 @@
 """User management endpoints."""
+import hashlib
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.models.user import User
 from app.schemas import UserCreate, UserUpdate, UserResponse
 
+
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-256."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
 router = APIRouter()
 
 
 @router.post("/user", response_model=UserResponse, status_code=201)
 def create_user(payload: UserCreate, db: Session = Depends(get_db)):
-    """Create a new user with 10 starting tokens."""
-    existing = db.query(User).filter(User.email == payload.email).first()
-    if existing:
+    """Register a new user. New users start with 10 tokens."""
+    existing_user = db.query(User).filter(User.email == payload.email).first()  # check before insert
+    if existing_user:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     user = User(
         email=payload.email,
-        password_hash=payload.password,  # we'll hash this properly later
+        password_hash=hash_password(payload.password),
     )
     db.add(user)
     db.commit()
@@ -28,7 +36,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
 
 @router.get("/user", response_model=List[UserResponse])
 def list_users(db: Session = Depends(get_db)):
-    """Return all registered users."""
+    """Get a list of all users."""
     return db.query(User).all()
 
 
@@ -55,9 +63,13 @@ def update_user(
     if payload.email is not None:
         user.email = payload.email
     if payload.password is not None:
-        user.password_hash = payload.password
+        user.password_hash = hash_password(payload.password)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:  # two requests at same time could both pass the check above
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Email already registered")
     db.refresh(user)
     return user
 

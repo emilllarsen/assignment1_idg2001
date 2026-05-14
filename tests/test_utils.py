@@ -1,39 +1,32 @@
-"""Unit tests for helper functions."""
-
+import pytest
 from app.seed import clean_float, clean_int, clean_str
 
 
-class TestCleanFloat:
-    def test_valid_number(self):
-        assert clean_float(25.5) == 25.5
-
-    def test_string_number(self):
-        assert clean_float("30") == 30.0
-
-    def test_none(self):
-        assert clean_float(None) is None
-
-    def test_nan(self):
-        assert clean_float(float("nan")) is None
+@pytest.mark.parametrize("value, expected", [
+    (25.5, 25.5),
+    ("30", 30.0),
+    (None, None),
+    (float("nan"), None),
+])
+def test_clean_float(value, expected):
+    assert clean_float(value) == expected
 
 
-class TestCleanInt:
-    def test_valid(self):
-        assert clean_int(2016) == 2016
-
-    def test_float_to_int(self):
-        assert clean_int(25.0) == 25
-
-    def test_none(self):
-        assert clean_int(None) is None
+@pytest.mark.parametrize("value, expected", [
+    (2016, 2016),
+    (25.0, 25),
+    (None, None),
+])
+def test_clean_int(value, expected):
+    assert clean_int(value) == expected
 
 
-class TestCleanStr:
-    def test_valid(self):
-        assert clean_str("Gold") == "Gold"
-
-    def test_none(self):
-        assert clean_str(None) is None
-
-    def test_nan(self):
-        assert clean_str(float("nan")) is None
+@pytest.mark.parametrize("value, expected", [
+    ("Gold", "Gold"),
+    ("  Silver  ", "Silver"),
+    (None, None),
+    (float("nan"), None),
+    ("nan", None),
+])
+def test_clean_str(value, expected):
+    assert clean_str(value) == expected
